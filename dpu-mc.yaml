@@ -1,0 +1,30 @@
+apiVersion: machineconfiguration.openshift.io/v1
+kind: MachineConfig
+metadata:
+  labels:
+    machineconfiguration.openshift.io/role: sriov
+  name: 99-bf2-switch
+spec:
+  config:
+    ignition:
+      version: 3.2.0
+  systemd:
+    units:
+    - name: dpu-switch.service
+      enabled: true
+      contents: |
+        [Unit]
+        Description=Switch BlueField2 card to SmartNIC/DPU mode
+        RequiresMountsFor=%t/containers
+        Wants=network.target
+        After=network-online.target
+        Before=kubelet.service
+        
+        [Service]
+        SuccessExitStatus=0 120
+        RemainAfterExit=True
+        Environment=PODMAN_SYSTEMD_UNIT=%n
+        ExecStart=/bin/bash -c '/usr/bin/podman run --pull always --replace --rm --name bf-switch --privileged --volume /dev:/dev --env BF_MODE --entrypoint /usr/local/bin/bf-switch registry.redhat.io/openshift4/ose-sriov-network-config-daemon && shutdown -r now'
+        Type=oneshot
+        [Install]
+        WantedBy=multi-user.target default.target
